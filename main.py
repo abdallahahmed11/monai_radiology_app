@@ -38,6 +38,9 @@ from monailabel.utils.others.class_utils import get_class_names
 from monailabel.utils.others.generic import get_bundle_models, strtobool
 from monailabel.utils.others.planner import HeuristicPlanner
 
+from run_scripts import create_monai_files
+
+
 logger = logging.getLogger(__name__)
 
 
@@ -261,6 +264,15 @@ class MyApp(MONAILabelApp):
 
         logger.info(f"Active Learning Scoring Methods:: {list(methods.keys())}")
         return methods
+
+    def create_task(self,class_name, model_name, model_path, labels, task, data_name):
+        create_monai_files(class_name=class_name,
+                            model_name=model_name,
+                            model_path=model_path,
+                            labels=labels,
+                            task=task,
+                            data_name=data_name)
+        return "task created"
 
 
 """
