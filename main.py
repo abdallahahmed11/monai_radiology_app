@@ -15,6 +15,8 @@ import os
 from typing import Dict
 
 import lib.configs
+import lib.trainers
+import lib.infers
 from lib.activelearning import Last
 from lib.infers.deepgrow_pipeline import InferDeepgrowPipeline
 from lib.infers.vertebra_pipeline import InferVertebraPipeline
@@ -38,8 +40,10 @@ from monailabel.utils.others.class_utils import get_class_names
 from monailabel.utils.others.generic import get_bundle_models, strtobool
 from monailabel.utils.others.planner import HeuristicPlanner
 
-from run_scripts import create_monai_files
-
+# OO
+from lib.configs.generic_segmentation import GenericSegmentation as Gconf
+from lib.trainers.generic_segmentation import GenericSegmentation as Gtrain
+from lib.infers.generic_segmentation import GenericSegmentation as Ginf
 
 logger = logging.getLogger(__name__)
 
@@ -94,6 +98,9 @@ class MyApp(MONAILabelApp):
             for k, v in configs.items():
                 if self.models.get(k):
                     continue
+                # OO
+                if k == "generic_segmentation":
+                    continue # To skip instantiating an object from the class generic at starting the application
                 if n == k or n == "all":
                     logger.info(f"+++ Adding Model: {k} => {v}")
                     self.models[k] = eval(f"{v}()")
@@ -111,6 +118,108 @@ class MyApp(MONAILabelApp):
             description="DeepLearning models for radiology",
             version=monailabel.__version__,
         )
+
+    def init_workflows(self):
+     # initialize all the workflows when starting the application
+        jsonPath = 'workflows_data.json'
+        if os.path.exists(jsonPath):
+            with open(jsonPath, "r") as file:
+                data = json.load(file)
+            for model_name, class_data in data.items():
+                self.create_task(model_name,class_data.get('labels'),class_data.get('fold'),class_data.get('plan_type'))
+                logger.info(f"+++ Adding Workflow: {model_name}")
+
+        else:
+            logger.info("No worklfows exist")
+
+
+ 
+
+    def update_jsonfile(self, model_name, labels, fold, plan_type):
+        #Function to update the json file that contains the workflows, because we will use it when the application is rebooted
+        jsonPath = 'workflows_data.json'
+        new_data={
+            "model_name":model_name,
+            "labels":labels,
+            "fold":fold,
+            "plan_type":plan_type
+
+        }
+        if not os.path.exists(jsonPath):
+            self.create_jsonfile()
+
+        with open(jsonPath, "r") as file:
+            data = json.load(file)
+
+        data[model_name]= new_data
+
+        with open(jsonPath, "w") as file:
+            json.dump(data, file, indent=4)
+
+        logger.info(f"+++++ Added {model_name} workflow to the json file")
+
+    def create_task(self, model_name, labels,fold, plan_type):
+        # Update JSON file for persistence
+        self.update_jsonfile(model_name, labels, fold, plan_type)
+
+        # Initialize the TaskConfig (GenericSegmentation)
+        model_config = Gconf(
+            labels=labels,
+            model_name=model_name,
+            fold=fold,
+            plan_type=plan_type,
+        )
+        
+        # Initialize the model configuration with necessary parameters
+        model_config.init(
+            name=model_name,
+            model_dir=self.model_dir,
+            conf=self.conf,
+            planner=self.planner
+        )
+        
+        # Add the model configuration to the app's models
+        self.models[model_name] = model_config
+
+        # Generate and register the TrainTask if available
+        trainer_task = model_config.trainer()
+        if trainer_task is not None:
+            self._trainers[model_name] = trainer_task
+
+
+        infer_task = self.models[model_name].infer()
+        self._infers[model_name] = infer_task
+
+
+        logger.info(f"Successfully added model '{model_name}'  in trainer tasks.")    
+
+    def initialize_inference_task(self, model_name):
+        
+        # Generate and register the InferTask
+        infer_task = self.models[model_name].infer()
+
+        if isinstance(infer_task, dict):
+            for key, task in infer_task.items():
+                self._infers[key] = task
+        else:
+            self._infers[model_name] = infer_task
+            
+        print("inferssss",self._infers)
+
+
+        return f"Successfully initialized inference task for model {model_name}"
+        
+
+
+
+    def create_jsonfile(self):
+        #function to create a json file for the workflows, if it doesn't exist
+        empty_data = {}
+        jsonPath = 'workflows_data.json'
+
+        with open(jsonPath, 'w') as file:
+            json.dump(empty_data, file)
+        logger.info("+++++++++ workflow's json file is created")        
 
     def init_datastore(self) -> Datastore:
         datastore = super().init_datastore()
@@ -265,14 +374,10 @@ class MyApp(MONAILabelApp):
         logger.info(f"Active Learning Scoring Methods:: {list(methods.keys())}")
         return methods
 
-    def create_task(self,class_name, model_name, model_path, labels, task, data_name):
-        create_monai_files(class_name=class_name,
-                            model_name=model_name,
-                            model_path=model_path,
-                            labels=labels,
-                            task=task,
-                            data_name=data_name)
-        return "task created"
+
+    
+
+    
 
 
 """
