@@ -39,7 +39,4 @@ jobs:
         with:
           python-version: '3.9'
 
-      - name: Build model
-        run: |
-          python scripts/build_model.py
 
