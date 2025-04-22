@@ -11,9 +11,9 @@
 
 from .deepedit import DeepEdit
 from .deepgrow import Deepgrow
-from .localization_spine import LocalizationSpine
-from .localization_vertebra import LocalizationVertebra
-from .segmentation import Segmentation
-from .segmentation_spleen import SegmentationSpleen
-from .segmentation_vertebra import SegmentationVertebra
-from .generic_segmentation import GenericSegmentation
+# from .localization_spine import LocalizationSpine
+# from .localization_vertebra import LocalizationVertebra
+# from .segmentation import Segmentation
+# from .segmentation_spleen import SegmentationSpleen
+# from .segmentation_vertebra import SegmentationVertebra
+# from .generic_segmentation import GenericSegmentation
